@@ -669,7 +669,9 @@ function ts() {
 
 function addTask() {
   const id = genId();
-  const task = { id, jour:'Lundi', tache:'Nouvelle tâche', admin: currentUser.initials, adminColor: currentUser.color, statut:'À faire', echeance: getNextFriday(), prio:'Haute', cout:'', rem:'', maj: ts(), majBy: currentUser.name };
+  const now = new Date();
+  const createdAt = now.toISOString().split('T')[0];
+  const task = { id, jour:'Lundi', tache:'Nouvelle tâche', admin: currentUser.initials, adminColor: currentUser.color, statut:'À faire', echeance: getNextFriday(), prio:'Haute', cout:'', rem:'', maj: ts(), majBy: currentUser.name, createdAt };
   setSyncing();
   db.ref(`suivi/tasks/${id}`).set(task);
   logHistory(`a ajouté une tâche : "${task.tache}"`);
@@ -760,7 +762,7 @@ function updateSortIcons() {
 }
 
 function sortValue(t, col) {
-  if (col === 'jour') return JOUR_ORDER.indexOf(t.jour ?? '');
+  if (col === 'jour') return (t.createdAt || '') + String(JOUR_ORDER.indexOf(t.jour ?? '')).padStart(2,'0');
   if (col === 'admin') return (t.admin || '').toLowerCase();
   if (col === 'statut') return STATUT_ORDER.indexOf(t.statut ?? '');
   if (col === 'echeance') return t.echeance || '';
@@ -815,6 +817,12 @@ function renderPersonFilters() {
   if (btn) btn.style.borderColor = filterPerson === (currentUser?.initials||'') ? 'var(--blue)' : '';
 }
 
+function formatDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function filteredTasks() {
   const fj = document.getElementById('f-jour')?.value || '';
   const fs = document.getElementById('f-statut')?.value || '';
@@ -839,10 +847,11 @@ function filteredTasks() {
 
 function rowHTML(t) {
   return `<tr id="row-${t.id}">
-    <td><div class="td-wrap">
+    <td><div class="td-wrap" style="flex-direction:column;align-items:flex-start;gap:2px">
       <select class="cell-input" onchange="updTask('${t.id}','jour',this.value)">
         ${JOURS.map(j=>`<option${j===t.jour?' selected':''}>${j}</option>`).join('')}
       </select>
+      ${t.createdAt ? `<span style="font-size:10px;color:var(--text3)">${formatDate(t.createdAt)}</span>` : ''}
     </div></td>
     <td><div class="td-wrap top">
       <textarea class="cell-input" rows="2" onblur="updTask('${t.id}','tache',this.value)">${t.tache}</textarea>
