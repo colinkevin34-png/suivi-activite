@@ -695,7 +695,11 @@ function addTask() {
   const now = new Date();
   const createdAt = now.toISOString().split('T')[0];
   const createdTs = now.getTime();
-  const task = { id, jour:'Lundi', tache:'Nouvelle tâche', admin: currentUser.initials, adminColor: currentUser.color, statut:'À faire', echeance: getNextFriday(), prio:'Haute', cout:'', rem:'', maj: ts(), majBy: currentUser.name, createdAt, createdTs };
+  // Default jourDate = today
+  const jourDate = createdAt;
+  const DAYS_FR = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const jour = DAYS_FR[now.getDay()];
+  const task = { id, jour, jourDate, tache:'Nouvelle tâche', admin: currentUser.initials, adminColor: currentUser.color, statut:'À faire', echeance: getNextFriday(), prio:'Haute', cout:'', rem:'', maj: ts(), majBy: currentUser.name, createdAt, createdTs };
   setSyncing();
   db.ref(`suivi/tasks/${id}`).set(task);
   logHistory(`a ajouté une tâche : "${task.tache}"`);
@@ -715,6 +719,21 @@ function updTask(id, field, val) {
   const upd = { [field]: val, maj: ts(), majBy: currentUser.name };
   db.ref(`suivi/tasks/${id}`).update(upd);
   if (field === 'statut') logHistory(`a changé le statut de "${tasks[id].tache}" en "${val}"`);
+}
+
+function updJourDate(id, dateVal) {
+  if (!tasks[id] || !dateVal) return;
+  const DAYS_FR = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const d = new Date(dateVal + 'T12:00:00');
+  const jour = DAYS_FR[d.getDay()];
+  setSyncing();
+  db.ref(`suivi/tasks/${id}`).update({
+    jourDate: dateVal,
+    jour: jour,
+    maj: ts(),
+    majBy: currentUser.name
+  });
+  logHistory(`a déplacé "${tasks[id].tache}" au ${jour} ${dateVal}`);
 }
 
 function delTask(id) {
@@ -786,7 +805,7 @@ function updateSortIcons() {
 }
 
 function sortValue(t, col) {
-  if (col === 'jour') return (t.createdAt || '') + String(JOUR_ORDER.indexOf(t.jour ?? '')).padStart(2,'0');
+  if (col === 'jour') return t.jourDate || (t.createdAt || '') + String(JOUR_ORDER.indexOf(t.jour ?? '')).padStart(2,'0');
   if (col === 'admin') return (t.admin || '').toLowerCase();
   if (col === 'statut') return STATUT_ORDER.indexOf(t.statut ?? '');
   if (col === 'echeance') return t.echeance || '';
@@ -920,11 +939,11 @@ function filteredTasks() {
 
 function rowHTML(t) {
   return `<tr id="row-${t.id}">
-    <td><div class="td-wrap" style="flex-direction:column;align-items:flex-start;gap:2px">
-      <select class="cell-input" onchange="updTask('${t.id}','jour',this.value)">
-        ${JOURS.map(j=>`<option${j===t.jour?' selected':''}>${j}</option>`).join('')}
-      </select>
-      <span style="font-size:10px;color:var(--text3)">${getDateForJour(t.jour)}</span>
+    <td><div class="td-wrap" style="flex-direction:column;align-items:flex-start;gap:3px">
+      <input class="cell-input" type="date" value="${t.jourDate||''}"
+        onchange="updJourDate('${t.id}', this.value)"
+        style="font-size:12px;color:var(--text);width:100%;min-width:110px">
+      <span style="font-size:11px;font-weight:600;color:var(--blue)">${t.jour||''}</span>
     </div></td>
     <td><div class="td-wrap top">
       <textarea class="cell-input" rows="2" onblur="updTask('${t.id}','tache',this.value)">${t.tache}</textarea>
