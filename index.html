@@ -376,23 +376,44 @@
 
     <!-- BOARD VIEW -->
     <div class="view" id="view-board">
-      <div class="toolbar">
+      <!-- BARRE DE FILTRES UNIFIÉE -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:var(--shadow)">
         <button class="btn btn-blue" onclick="addTask()"><i class="ti ti-plus"></i> Nouvelle tâche</button>
-        <select class="sel" id="f-jour" onchange="renderBoard()"><option value="">Tous les jours</option><option>Lundi</option><option>Mardi</option><option>Mercredi</option><option>Jeudi</option><option>Vendredi</option></select>
-        <select class="sel" id="f-statut" onchange="renderBoard()"><option value="">Tous statuts</option><option>À faire</option><option>En cours</option><option>Terminé</option><option>Bloqué</option></select>
-        <select class="sel" id="f-prio" onchange="renderBoard()"><option value="">Toutes priorités</option><option>Ultra haute</option><option>Haute</option><option>Moyenne</option><option>Basse</option></select>
-        <input class="search-box" id="f-search" placeholder="🔍 Rechercher…" oninput="renderBoard()">
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Personne :</span>
-        <div id="person-filters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
-        <button class="btn" id="btn-mes-taches" onclick="toggleMyTasks()" style="font-size:12px;padding:5px 12px">
-          <i class="ti ti-user-check"></i> Mes tâches
+        <div style="width:1px;height:24px;background:var(--border);flex-shrink:0"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <i class="ti ti-user" style="font-size:13px;color:var(--text2)"></i>
+          <select class="sel" id="f-person" onchange="onPersonSelect()" style="min-width:130px">
+            <option value="">Toutes les personnes</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <i class="ti ti-calendar" style="font-size:13px;color:var(--text2)"></i>
+          <select class="sel" id="f-jour" onchange="renderBoard()">
+            <option value="">Tous les jours</option>
+            <option>Lundi</option><option>Mardi</option><option>Mercredi</option><option>Jeudi</option><option>Vendredi</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <i class="ti ti-circle-dot" style="font-size:13px;color:var(--text2)"></i>
+          <select class="sel" id="f-statut" onchange="renderBoard()">
+            <option value="">Tous statuts</option>
+            <option>À faire</option><option>En cours</option><option>Terminé</option><option>Bloqué</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <i class="ti ti-flag" style="font-size:13px;color:var(--text2)"></i>
+          <select class="sel" id="f-prio" onchange="renderBoard()">
+            <option value="">Toutes priorités</option>
+            <option>Ultra haute</option><option>Haute</option><option>Moyenne</option><option>Basse</option>
+          </select>
+        </div>
+        <input class="search-box" id="f-search" placeholder="🔍 Rechercher…" oninput="renderBoard()" style="flex:1;min-width:140px">
+        <button class="btn" onclick="resetFilters()" style="font-size:12px;color:var(--text2)" title="Effacer tous les filtres">
+          <i class="ti ti-x"></i> Effacer
         </button>
-        <button class="btn" onclick="clearPersonFilter()" style="font-size:12px;padding:5px 12px;color:var(--text2)">
-          <i class="ti ti-x"></i> Tous
-        </button>
       </div>
+      <!-- avatars online (conservés pour compatibilité) -->
+      <div id="person-filters" style="display:none"></div>
 
       <div class="table-container">
         <div class="section-header" onclick="toggleSection('todo')">
@@ -595,12 +616,14 @@ function startApp() {
     onlineUsers = snap.val() || {};
     renderOnlineUsers();
     renderPersonFilters();
+    renderPersonDropdown();
   });
 
   db.ref('suivi/tasks').on('value', snap => {
     tasks = snap.val() || {};
     setSynced();
     renderPersonFilters();
+    renderPersonDropdown();
     renderActive();
     updateStats();
   });
@@ -671,7 +694,8 @@ function addTask() {
   const id = genId();
   const now = new Date();
   const createdAt = now.toISOString().split('T')[0];
-  const task = { id, jour:'Lundi', tache:'Nouvelle tâche', admin: currentUser.initials, adminColor: currentUser.color, statut:'À faire', echeance: getNextFriday(), prio:'Haute', cout:'', rem:'', maj: ts(), majBy: currentUser.name, createdAt };
+  const createdTs = now.getTime();
+  const task = { id, jour:'Lundi', tache:'Nouvelle tâche', admin: currentUser.initials, adminColor: currentUser.color, statut:'À faire', echeance: getNextFriday(), prio:'Haute', cout:'', rem:'', maj: ts(), majBy: currentUser.name, createdAt, createdTs };
   setSyncing();
   db.ref(`suivi/tasks/${id}`).set(task);
   logHistory(`a ajouté une tâche : "${task.tache}"`);
@@ -817,6 +841,38 @@ function renderPersonFilters() {
   if (btn) btn.style.borderColor = filterPerson === (currentUser?.initials||'') ? 'var(--blue)' : '';
 }
 
+function onPersonSelect() {
+  filterPerson = '';
+  renderPersonFilters();
+  renderBoard();
+}
+
+function resetFilters() {
+  filterPerson = '';
+  const ids = ['f-person','f-jour','f-statut','f-prio'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const s = document.getElementById('f-search'); if (s) s.value = '';
+  renderPersonFilters();
+  renderBoard();
+}
+
+function renderPersonDropdown() {
+  const sel = document.getElementById('f-person');
+  if (!sel) return;
+  const current = sel.value;
+  const people = {};
+  Object.values(tasks).forEach(t => {
+    if (t.admin && t.admin !== '—') people[t.admin] = t.adminName || t.admin;
+  });
+  Object.values(onlineUsers).forEach(u => {
+    people[u.initials] = u.name || u.initials;
+  });
+  sel.innerHTML = '<option value="">Toutes les personnes</option>' +
+    Object.entries(people).map(([init, name]) =>
+      `<option value="${init}"${current===init?' selected':''}>${name} (${init})</option>`
+    ).join('');
+}
+
 function formatDate(iso) {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
@@ -828,8 +884,10 @@ function filteredTasks() {
   const fs = document.getElementById('f-statut')?.value || '';
   const fp = document.getElementById('f-prio')?.value || '';
   const q = (document.getElementById('f-search')?.value || '').toLowerCase();
+  const fperson = document.getElementById('f-person')?.value || '';
   let arr = Object.values(tasks).filter(t =>
     (!fj || t.jour === fj) && (!fs || t.statut === fs) && (!fp || t.prio === fp) &&
+    (!fperson || t.admin === fperson) &&
     (!filterPerson || t.admin === filterPerson) &&
     (!q || t.tache.toLowerCase().includes(q) || (t.rem||'').toLowerCase().includes(q))
   );
@@ -851,7 +909,7 @@ function rowHTML(t) {
       <select class="cell-input" onchange="updTask('${t.id}','jour',this.value)">
         ${JOURS.map(j=>`<option${j===t.jour?' selected':''}>${j}</option>`).join('')}
       </select>
-      ${t.createdAt ? `<span style="font-size:10px;color:var(--text3)">${formatDate(t.createdAt)}</span>` : ''}
+      <span style="font-size:10px;color:var(--text3)">${t.createdAt ? formatDate(t.createdAt) : (t.maj ? t.maj.split(' ').slice(0,2).join(' ') : '')}</span>
     </div></td>
     <td><div class="td-wrap top">
       <textarea class="cell-input" rows="2" onblur="updTask('${t.id}','tache',this.value)">${t.tache}</textarea>
