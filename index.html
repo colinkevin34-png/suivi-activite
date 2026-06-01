@@ -879,6 +879,21 @@ function formatDate(iso) {
   return `${d}/${m}/${y}`;
 }
 
+function getDateForJour(jour) {
+  // Returns the date of the given weekday in the current week (Monday=start)
+  const JOUR_IDX = {'Lundi':1,'Mardi':2,'Mercredi':3,'Jeudi':4,'Vendredi':5};
+  const idx = JOUR_IDX[jour];
+  if (!idx) return '';
+  const today = new Date();
+  const day = today.getDay() || 7; // 1=Mon ... 7=Sun
+  const diff = idx - day;
+  const target = new Date(today);
+  target.setDate(today.getDate() + diff);
+  const d = String(target.getDate()).padStart(2,'0');
+  const m = String(target.getMonth()+1).padStart(2,'0');
+  return `${d}/${m}`;
+}
+
 function filteredTasks() {
   const fj = document.getElementById('f-jour')?.value || '';
   const fs = document.getElementById('f-statut')?.value || '';
@@ -909,7 +924,7 @@ function rowHTML(t) {
       <select class="cell-input" onchange="updTask('${t.id}','jour',this.value)">
         ${JOURS.map(j=>`<option${j===t.jour?' selected':''}>${j}</option>`).join('')}
       </select>
-      <span style="font-size:10px;color:var(--text3)">${t.createdAt ? formatDate(t.createdAt) : (t.maj ? t.maj.split(' ').slice(0,2).join(' ') : '')}</span>
+      <span style="font-size:10px;color:var(--text3)">${getDateForJour(t.jour)}</span>
     </div></td>
     <td><div class="td-wrap top">
       <textarea class="cell-input" rows="2" onblur="updTask('${t.id}','tache',this.value)">${t.tache}</textarea>
